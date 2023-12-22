@@ -13,8 +13,6 @@ From your terminal:
 - Run `Make` from within the repo
   - `$ make`
 
-<img src="https://s3.amazonaws.com/htscodelookup.com/github/pjl-software/self-signed-cert-generator/self-signed-cert-generator.gif" width="45%" height="45%"  alt="running the script"/>
-
 ## For Help
 
 From your terminal:
