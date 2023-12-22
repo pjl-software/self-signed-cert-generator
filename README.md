@@ -24,6 +24,10 @@ From your terminal:
 
 There will be a new directory in this repo named `generated-files` with ~9 files in it.
 
+## Using the Output
+
+I've used this script to generate files used in a Spring Boot back-end and Angular front-end [here](https://github.com/pjl-software/full-stack-auth-repo)
+
 ## Need More Help
 
-Opea an Issue
+Open an Issue
