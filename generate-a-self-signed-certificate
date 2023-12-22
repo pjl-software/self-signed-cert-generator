@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+
+#
+## Initialize Variables
+#
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+FILE_OUTPUT_DIRECTORY="${SCRIPT_DIR}/generated-files"
+
+DEFAULT_CA_FILE="ca.crt"
+DEFAULT_CA_NAME="root"
+DEFAULT_CERTIFICATE_FILE="server.crt"
+DEFAULT_DAYS_VALID=90
+DEFAULT_OPEN_SSL_CONFIGURATION_FILE="server.csr.cnf"
+DEFAULT_OPEN_SSL_FILE="server.csr"
+DEFAULT_P12_ALIAS="pjl"
+DEFAULT_P12_FILE="server.p12"
+DEFAULT_ROOT_SSL_CERT_PEM_NAME=rootCA.pem
+DEFAULT_RSA_KEY_NAME="rootCA.key"
+DEFAULT_SERVER_KEY_FILE="server.key"
+DEFAULT_V3_EXT_FILENAME="v3.ext"
+
+#
+## Functions
+#
+deleteAllFilesInDirectoryCheck() {
+    DIRECTORY_TO_DELETE_FILES=$1
+
+    echo
+
+    read -r -p "Delete all files in ${DIRECTORY_TO_DELETE_FILES}? (y/n) " yn
+    case $yn in
+    y | Y)
+        echo "Removing files from ${DIRECTORY_TO_DELETE_FILES}..."
+        rm "${DIRECTORY_TO_DELETE_FILES}"/*
+        ;;
+    n | N)
+        echo "Proceeding without deleting files..."
+        ;;
+    *)
+        echo "invalid response"
+        exit 1
+        ;;
+    esac
+    echo
+}
+
+############################################################
+# Help                                                     #
+############################################################
+help() {
+    echo ""
+    echo -e "This script chains together the bash commands necessary to generate a self-signed certificate on your local machine (necessary for running apps locally over SSL/HTTPS). While running, the script will print the steps being run and help guide you along the way. Note that there is a manual step that you must peform as part of the overall process. All files will be put in the ${FILE_OUTPUT_DIRECTORY} directory" | fmt
+    echo
+    echo -e "This script will create ~9 files. Ultimately, you may only need a few depending on your use case." | fmt
+    echo
+    echo -e "Be sure not to commit these to GitHub. Although they are development-only files, it's best practice not to commit this stuff regardless. This is solely for developmental purposes and not meant, in any way, to be used in a production environment" | fmt
+    echo
+    echo -e "This script was written referencing these tutorials:"
+    echo -e "\thttps://www.freecodecamp.org/news/how-to-get-https-working-on-your-local-development-environment-in-5-minutes-7af615770eec/" | fmt
+    echo -e "\thttps://medium.com/javarevisited/how-to-enable-https-locally-without-getting-annoying-browser-privacyerrors-in-a-spring-boot-a6137dacbc0a" | fmt
+    echo ""
+    echo -e "Usage: $0 [-h]" | fmt
+    echo -e "\t-h\t Display this help message" | fmt
+    echo ""
+}
+
+############################################################
+############################################################
+# Main Program                                             #
+############################################################
+############################################################
+
+while getopts "h" opt; do
+    case $opt in
+    h)
+        help
+        exit 0
+        ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        help
+        exit 1
+        ;;
+    :)
+        echo ""
+        echo "Option -$OPTARG requires an argument." >&2
+        help
+        exit 1
+        ;;
+    esac
+done
+
+echo
+echo -e "Attempting to create a new directory (${FILE_OUTPUT_DIRECTORY}) to store the generate files although the directory may already be there..." | fmt
+echo
+mkdir "${FILE_OUTPUT_DIRECTORY}"
+echo
+
+echo
+echo -e "Changing directories into ${FILE_OUTPUT_DIRECTORY} so all files are generated there..."
+cd "${FILE_OUTPUT_DIRECTORY}" || exit
+echo
+
+deleteAllFilesInDirectoryCheck "${FILE_OUTPUT_DIRECTORY}"
+
+echo
+echo -e "Generate a RSA-2048 key and save it to a file: rootCA.key. This file will be used as the key to generate the Root SSL certificate. You will be prompted for a pass phrase which you'll need to enter each time you use this particular key to generate a certificate." | fmt
+echo
+echo "Suggest using abc123 for developmental purposes, but you can pick anything. Just use it throughout."
+echo
+
+openssl genrsa -des3 -out "${DEFAULT_RSA_KEY_NAME}" 2048
+
+echo
+echo -e "You can use the key you generated to create a new Root SSL certificate. Save it to a file named ${DEFAULT_ROOT_SSL_CERT_PEM_NAME}. This certificate will have a validity of ${DEFAULT_DAYS_VALID} days. Feel free to change it to any number of days you want. You’ll also be prompted for other optional information, but you should at least give a an 'Organization Name' or 'Common Name' to help identify the certificate." | fmt
+echo
+echo -e "Provide the password set above." | fmt
+echo
+
+openssl req -x509 -new -nodes -key "${DEFAULT_RSA_KEY_NAME}" -sha256 -days "${DEFAULT_DAYS_VALID}" -out "${DEFAULT_ROOT_SSL_CERT_PEM_NAME}"
+
+echo
+echo -e "NOW YOU MUST TAKE A MANUAL STEP:" | fmt
+echo -e "We need to add (one time) the root certificate to any laptops, desktops, tablets, and phones that will be accessing your HTTPS sites." | fmt
+echo
+echo -e "For Mac Users" | fmt
+echo -e "Open Keychain Access on your Mac and go to the Certificates category in your System keychain. Once there, import the ${FILE_OUTPUT_DIRECTORY}/${DEFAULT_ROOT_SSL_CERT_PEM_NAME} using File > Import Items. Double click the imported certificate and change the 'When using this certificate:' dropdown to 'Always Trust' in the 'Trust' section." | fmt
+echo
+echo -e "For Non-Mac Users" | fmt
+echo -e "Search how to manage certificates in your browser of choice and upload the ${DEFAULT_ROOT_SSL_CERT_PEM_NAME} to Trusted Root Certificates." | fmt
+echo
+echo -e "In Chrome for example, open settings and search 'certificates'. Click 'Security' and then click 'Manage Certificates'. On my Mac, this will open Keychain, not sure what happens on other operating systems, but this is where you'll want to add the ${DEFAULT_ROOT_SSL_CERT_PEM_NAME} to trust the file." | fmt
+
+echo
+read -r -p "Press enter to continue once you've followed the manual step above. ctrl-c to quit."
+echo
+
+echo
+echo -e "Creating an OpenSSL configuration file (${DEFAULT_OPEN_SSL_CONFIGURATION_FILE}) so you can import these settings when creating a certificate instead of entering them on the command line" | fmt
+
+cat <<'EOF' >"${FILE_OUTPUT_DIRECTORY}"/"${DEFAULT_OPEN_SSL_CONFIGURATION_FILE}"
+[req]
+default_bits = 2048
+prompt = no
+default_md = sha256
+distinguished_name = dn
+
+[dn]
+C=US
+ST=RandomState
+L=RandomCity
+O=RandomOrganization
+OU=RandomOrganizationUnit
+emailAddress=hello@example.com
+CN = localhost
+
+EOF
+
+echo
+echo -e "Create a ${DEFAULT_V3_EXT_FILENAME} file in order to create a X509 v3 certificate. Notice how we're specifying subjectAltName here." | fmt
+echo
+
+cat <<'EOF' >"${FILE_OUTPUT_DIRECTORY}"/"${DEFAULT_V3_EXT_FILENAME}"
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = localhost
+
+EOF
+
+echo
+echo -e "Create a certificate key for localhost using the configuration settings stored in ${DEFAULT_OPEN_SSL_CONFIGURATION_FILE}. This key is stored in ${DEFAULT_SERVER_KEY_FILE} ." | fmt
+echo
+
+openssl req -new -sha256 -nodes -out "${DEFAULT_OPEN_SSL_FILE}" -newkey rsa:2048 -keyout "${DEFAULT_SERVER_KEY_FILE}" -config <(cat "${DEFAULT_OPEN_SSL_CONFIGURATION_FILE}")
+
+echo
+echo -e "A certificate signing request is issued via the root SSL certificate we created earlier to create a domain certificate for localhost. The output is a certificate file called ${DEFAULT_CERTIFICATE_FILE}." | fmt
+echo
+
+openssl x509 -req -in "${DEFAULT_OPEN_SSL_FILE}" -CA "${DEFAULT_ROOT_SSL_CERT_PEM_NAME}" -CAkey "${DEFAULT_RSA_KEY_NAME}" -CAcreateserial -out "${DEFAULT_CERTIFICATE_FILE}" -days "${DEFAULT_DAYS_VALID}" -sha256 -extfile "${DEFAULT_V3_EXT_FILENAME}"
+
+echo
+echo -e "Convert the x.509 cert and key to a pkcs12 file." | fmt
+echo
+
+openssl pkcs12 -export -in "${DEFAULT_CERTIFICATE_FILE}" -inkey "${DEFAULT_SERVER_KEY_FILE}" \
+    -out "${DEFAULT_P12_FILE}" -name "${DEFAULT_P12_ALIAS}" \
+    -CAfile "${DEFAULT_CA_FILE}" -caname "${DEFAULT_CA_NAME}"
+
+echo
+echo -e "You now should have all the files you need to enable SSL locally on you back-end or front-end codebase in the ${FILE_OUTPUT_DIRECTORY}. Example usage of these files can be seen in this web app repo: https://github.com/pjl-software/full-stack-auth-repo" | fmt
+echo
