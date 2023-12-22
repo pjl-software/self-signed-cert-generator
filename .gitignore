@@ -1,0 +1,12 @@
+# Don't commit the generated files to GitHub
+**/generated-files/
+
+*.key
+*.pem
+*.srl
+*.crt
+*.csr
+*.cnf
+*.key
+*.p12
+*.ext
