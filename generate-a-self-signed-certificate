@@ -20,31 +20,6 @@ DEFAULT_RSA_KEY_NAME="rootCA.key"
 DEFAULT_SERVER_KEY_FILE="server.key"
 DEFAULT_V3_EXT_FILENAME="v3.ext"
 
-#
-## Functions
-#
-deleteAllFilesInDirectoryCheck() {
-    DIRECTORY_TO_DELETE_FILES=$1
-
-    echo
-
-    read -r -p "Delete all files in ${DIRECTORY_TO_DELETE_FILES}? (y/n) " yn
-    case $yn in
-    y | Y)
-        echo "Removing files from ${DIRECTORY_TO_DELETE_FILES}..."
-        rm "${DIRECTORY_TO_DELETE_FILES}"/*
-        ;;
-    n | N)
-        echo "Proceeding without deleting files..."
-        ;;
-    *)
-        echo "invalid response"
-        exit 1
-        ;;
-    esac
-    echo
-}
-
 ############################################################
 # Help                                                     #
 ############################################################
@@ -101,8 +76,6 @@ echo
 echo -e "Changing directories into ${FILE_OUTPUT_DIRECTORY} so all files are generated there..."
 cd "${FILE_OUTPUT_DIRECTORY}" || exit
 echo
-
-deleteAllFilesInDirectoryCheck "${FILE_OUTPUT_DIRECTORY}"
 
 echo
 echo -e "Generate a RSA-2048 key and save it to a file: rootCA.key. This file will be used as the key to generate the Root SSL certificate. You will be prompted for a pass phrase which you'll need to enter each time you use this particular key to generate a certificate." | fmt
